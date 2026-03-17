@@ -3,9 +3,9 @@ from typing import Dict, List
 
 import json
 class ApartmentSettlement(BaseModel):
-    amount_pln: float
-    date_due: str
-    apartment: str
+    iloscPln: float
+    terminPlatnosci: str
+    Apartament: str
     settlement_year: int
     settlement_month: int
     type: str
