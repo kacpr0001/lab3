@@ -19,7 +19,7 @@
     },
     "tenant-3": {
         "name": "tenant-3",
-        "apartment": "room-medium",
+        "apartment": "apart-polanka",
         "room": "room-medium",
         "rent_pln": 1300.0,
         "deposit_pln": 2700.0,
