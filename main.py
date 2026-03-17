@@ -2,6 +2,22 @@ from pydantic import BaseModel
 from typing import Dict, List
 
 import json
+class ApartmentSettlement(BaseModel):
+    iloscPln: float
+    terminPlatnosci: str
+    Apartament: str
+    settlement_year: int
+    settlement_month: int
+    type: str
+
+    @staticmethod
+    def from_json_file(file_path: str) -> List['ApartmentSettlement']:
+        data = None
+        with open(file_path, 'r') as file:
+            data = json.load(file)
+        assert isinstance(data, list), "ApartmentSettlement"
+        return [Bill(**apartmentsettlement) for apartmentsettlement in data]
+    
 
 
 class Parameters(BaseModel):
@@ -9,7 +25,7 @@ class Parameters(BaseModel):
     tenants_json_path: str = 'data/tenants.json'
     transfers_json_path: str = 'data/transfers.json'
     bills_json_path: str = 'data/bills.json'
-
+    ApartmentSettlement: str = 'data/apartmentsettlement.json'
 
 class Room(BaseModel):
     name: str
