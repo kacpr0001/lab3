@@ -101,7 +101,7 @@ class Manager:
         self.bills = Bill.from_json_file(self.parameters.bills_json_path)
 
 class TenantSettlement:
-    tenant: str
+    najemca: str
     settlement_year: int
     settlement_month: int
     settlement_apartment: str
