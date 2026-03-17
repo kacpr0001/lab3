@@ -1,54 +1,52 @@
 from pydantic import BaseModel
-from typing import Dict, List
-
+from typing import Dict, List, Type, TypeVar
 import json
-class ApartmentSettlement(BaseModel):
-    iloscPln: float
-    terminPlatnosci: str
-    Apartament: str
-    settlement_year: int
-    settlement_month: int
-    type: str
 
-    @staticmethod
-    def from_json_file(file_path: str) -> List['ApartmentSettlement']:
-        data = None
-        with open(file_path, 'r') as file:
-            data = json.load(file)
-        assert isinstance(data, list), "ApartmentSettlement"
-        return [Bill(**apartmentsettlement) for apartmentsettlement in data]
-    
+# ======================
+# WSPÓLNE NARZĘDZIA
+# ======================
+
+def load_json(file_path: str):
+    with open(file_path, 'r') as file:
+        return json.load(file)
 
 
-class Parameters(BaseModel):
-    apartments_json_path: str = 'data/apartments.json'
-    tenants_json_path: str = 'data/tenants.json'
-    transfers_json_path: str = 'data/transfers.json'
-    bills_json_path: str = 'data/bills.json'
-    ApartmentSettlement: str = 'data/apartmentsettlement.json'
+T = TypeVar('T', bound=BaseModel)
+
+
+class JsonLoadable(BaseModel):
+
+    @classmethod
+    def load_list(cls: Type[T], file_path: str) -> List[T]:
+        data = load_json(file_path)
+        assert isinstance(data, list), f"Expected list for {cls.__name__}"
+        return [cls(**item) for item in data]
+
+    @classmethod
+    def load_dict(cls: Type[T], file_path: str) -> Dict[str, T]:
+        data = load_json(file_path)
+        assert isinstance(data, dict), f"Expected dict for {cls.__name__}"
+        return {key: cls(**value) for key, value in data.items()}
+
+
+# ======================
+# MODELE
+# ======================
 
 class Room(BaseModel):
     name: str
     area_m2: float
 
 
-class Apartment(BaseModel):
+class Apartment(JsonLoadable):
     key: str
     name: str
     location: str
     area_m2: float
     rooms: Dict[str, Room]
 
-    @staticmethod
-    def from_json_file(file_path: str) -> Dict[str,'Apartment']:
-        data = None
-        with open(file_path, 'r') as file:
-            data = json.load(file)
-        assert isinstance(data, dict), "Expected a dictionary of apartments"
-        return {key: Apartment(**apartment) for key, apartment in data.items()}
 
-    
-class Tenant(BaseModel):
+class Tenant(JsonLoadable):
     name: str
     apartment: str
     room: str
@@ -57,32 +55,16 @@ class Tenant(BaseModel):
     date_agreement_from: str
     date_agreement_to: str
 
-    @staticmethod
-    def from_json_file(file_path: str) -> Dict[str,'Tenant']:
-        data = None
-        with open(file_path, 'r') as file:
-            data = json.load(file)
-        assert isinstance(data, dict), "Expected a dictionary of tenants"
-        return {key: Tenant(**tenant) for key, tenant in data.items()}
-    
 
-class Transfer(BaseModel):
+class Transfer(JsonLoadable):
     amount_pln: float
     date: str
     settlement_year: int | None
     settlement_month: int | None
     tenant: str
 
-    @staticmethod
-    def from_json_file(file_path: str) -> List['Transfer']:
-        data = None
-        with open(file_path, 'r') as file:
-            data = json.load(file)
-        assert isinstance(data, list), "Expected a list of transfers"
-        return [Transfer(**transfer) for transfer in data]
 
-
-class Bill(BaseModel):
+class Bill(JsonLoadable):
     amount_pln: float
     date_due: str
     apartment: str
@@ -90,32 +72,48 @@ class Bill(BaseModel):
     settlement_month: int
     type: str
 
-    @staticmethod
-    def from_json_file(file_path: str) -> List['Bill']:
-        data = None
-        with open(file_path, 'r') as file:
-            data = json.load(file)
-        assert isinstance(data, list), "Expected a list of bills"
-        return [Bill(**bill) for bill in data]
 
+class ApartmentSettlement(JsonLoadable):
+    amount_pln: float
+    description: str
+    apartment: str
+    settlement_year: int
+    settlement_month: int
+    type: str
+
+
+# ======================
+# PARAMETRY
+# ======================
+
+class Parameters(BaseModel):
+    apartments_json_path: str = 'data/apartments.json'
+    tenants_json_path: str = 'data/tenants.json'
+    transfers_json_path: str = 'data/transfers.json'
+    bills_json_path: str = 'data/bills.json'
+    apartment_settlement_json_path: str = 'data/apartmentsettlement.json'
+
+
+# ======================
+# MANAGER
+# ======================
 
 class Manager:
     def __init__(self, parameters: Parameters):
-        self.parameters = parameters 
+        self.parameters = parameters
 
-        self.apartments = {}
-        self.tenants = {}
-        self.transfers = []
-        self.bills = []
-       
-        self.load_data()
+        self.apartments = Apartment.load_dict(parameters.apartments_json_path)
+        self.tenants = Tenant.load_dict(parameters.tenants_json_path)
+        self.transfers = Transfer.load_list(parameters.transfers_json_path)
+        self.bills = Bill.load_list(parameters.bills_json_path)
+        self.apartment_settlements = ApartmentSettlement.load_list(
+            parameters.apartment_settlement_json_path
+        )
 
-    def load_data(self):
-        self.apartments = Apartment.from_json_file(self.parameters.apartments_json_path)
-        self.tenants = Tenant.from_json_file(self.parameters.tenants_json_path)
-        self.transfers = Transfer.from_json_file(self.parameters.transfers_json_path)
-        self.bills = Bill.from_json_file(self.parameters.bills_json_path)
 
+# ======================
+# MAIN
+# ======================
 
 if __name__ == '__main__':
     parameters = Parameters()
@@ -123,15 +121,21 @@ if __name__ == '__main__':
 
     for apartment in manager.apartments.values():
         print(apartment.key, apartment.name, apartment.location, apartment.area_m2)
+
         for room in apartment.rooms.values():
             print('  ', room.name, room.area_m2)
-        
+
         for bill in manager.bills:
             if bill.apartment == apartment.key:
-                print('  ', bill.amount_pln, bill.date_due, bill.settlement_year, bill.settlement_month, bill.type)
+                print('  ', bill.amount_pln, bill.date_due,
+                      bill.settlement_year, bill.settlement_month, bill.type)
 
     for tenant in manager.tenants.values():
-        print(tenant.name, tenant.apartment, tenant.room, tenant.rent_pln, tenant.deposit_pln, tenant.date_agreement_from, tenant.date_agreement_to)
+        print(tenant.name, tenant.apartment, tenant.room,
+              tenant.rent_pln, tenant.deposit_pln,
+              tenant.date_agreement_from, tenant.date_agreement_to)
+
         for transfer in manager.transfers:
             if transfer.tenant == tenant.name:
-                print('  ', transfer.amount_pln, transfer.date, transfer.settlement_year, transfer.settlement_month)
+                print('  ', transfer.amount_pln, transfer.date,
+                      transfer.settlement_year, transfer.settlement_month)
